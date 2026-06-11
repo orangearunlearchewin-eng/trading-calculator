@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Position Size Calculator</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  nav { display: flex; gap: 8px; }
+  nav button {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  nav button.active {
+    color: var(--text);
+    border-color: var(--accent);
+  }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  section h2 {
+    margin: 0 0 16px 0;
+    font-size: 15px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  input, select {
+    width: 100%;
+    background: #0d1117;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-size: 14px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .field { margin-bottom: 0; }
+  .toggle-group {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .toggle-group button {
+    flex: 1;
+    background: #0d1117;
+    color: var(--muted);
+    border: none;
+    padding: 9px 10px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .toggle-group button.active {
+    background: var(--accent);
+    color: #0d1117;
+    font-weight: 600;
+  }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .result-card {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .result-card .label {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  .result-card .value { font-size: 22px; font-weight: 600; }
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .rr-bar {
+    position: relative;
+    height: 28px;
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .rr-bar .segment {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+  .rr-bar .seg-risk { background: rgba(248, 81, 73, 0.35); }
+  .rr-bar .seg-reward { background: rgba(63, 185, 80, 0.35); }
+  .rr-bar .marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--text);
+  }
+  .rr-bar .marker-label {
+    position: absolute;
+    top: -20px;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .rr-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .note {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+  .warning {
+    color: var(--red);
+    font-size: 13px;
+    margin-top: 10px;
+  }
+  button.action {
+    background: var(--accent);
+    color: #0d1117;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.action:disabled { opacity: 0.4; cursor: default; }
+  button.save {
+    background: var(--accent);
+    color: #0d1117;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 16px;
+  }
+  .status-msg { font-size: 13px; margin-top: 10px; color: var(--muted); }
+  .status-msg.error { color: var(--red); }
+  .status-msg.success { color: var(--green); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Position Size Calculator</h1>
+  <nav>
+    <button id="tabCalc" class="active">Calculator</button>
+    <button id="tabSettings">Settings</button>
+  </nav>
+</header>
+
+<div id="calcView">
+
+  <section>
+    <h2>Trade Setup</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="instrument">Instrument</label>
+        <select id="instrument">
+          <option value="ES" data-point="50" data-tick="0.25">ES - E-mini S&amp;P 500</option>
+          <option value="MES" data-point="5" data-tick="0.25">MES - Micro S&amp;P 500</option>
+          <option value="NQ" data-point="20" data-tick="0.25">NQ - E-mini Nasdaq 100</option>
+          <option value="MNQ" data-point="2" data-tick="0.25">MNQ - Micro Nasdaq 100</option>
+          <option value="YM" data-point="5" data-tick="1">YM - E-mini Dow</option>
+          <option value="MYM" data-point="0.5" data-tick="1">MYM - Micro Dow</option>
+          <option value="RTY" data-point="50" data-tick="0.1">RTY - E-mini Russell 2000</option>
+          <option value="M2K" data-point="5" data-tick="0.1">M2K - Micro Russell 2000</option>
+          <option value="CL" data-point="1000" data-tick="0.01">CL - Crude Oil</option>
+          <option value="MCL" data-point="100" data-tick="0.01">MCL - Micro Crude Oil</option>
+          <option value="GC" data-point="100" data-tick="0.1">GC - Gold</option>
+          <option value="MGC" data-point="10" data-tick="0.1">MGC - Micro Gold</option>
+          <option value="custom" data-point="0" data-tick="0">Custom</option>
+        </select>
+      </div>
+      <div class="field" id="customPointWrap">
+        <label for="customPoint">Point Value ($ per 1.00)</label>
+        <input type="number" id="customPoint" step="any" placeholder="e.g. 50" />
+      </div>
+      <div class="field">
+        <label>Direction</label>
+        <div class="toggle-group">
+          <button id="dirLong" class="active">Long</button>
+          <button id="dirShort">Short</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Account &amp; Risk</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="balance">Account Balance ($)</label>
+        <input type="number" id="balance" step="any" placeholder="e.g. 50000" />
+      </div>
+      <div class="field">
+        <label>Risk Mode</label>
+        <div class="toggle-group">
+          <button id="riskPercentBtn" class="active">% of account</button>
+          <button id="riskDollarBtn">$ amount</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="riskValue" id="riskValueLabel">Risk %</label>
+        <input type="number" id="riskValue" step="any" placeholder="e.g. 1" />
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Prices</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="entry">Entry Price</label>
+        <input type="number" id="entry" step="any" placeholder="e.g. 5800" />
+      </div>
+      <div class="field">
+        <label for="stop">Stop Loss Price</label>
+        <input type="number" id="stop" step="any" placeholder="e.g. 5790" />
+      </div>
+      <div class="field">
+        <label for="target">Take Profit Price (optional)</label>
+        <input type="number" id="target" step="any" placeholder="e.g. 5825" />
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Results</h2>
+    <div id="warningMsg" class="warning hidden"></div>
+    <div class="results-grid">
+      <div class="result-card">
+        <div class="label">Position Size</div>
+        <div class="value" id="resSize">--</div>
+      </div>
+      <div class="result-card">
+        <div class="label">Dollar Risk</div>
+        <div class="value negative" id="resRisk">--</div>
+      </div>
+      <div class="result-card">
+        <div class="label">Dollar Reward</div>
+        <div class="value positive" id="resReward">--</div>
+      </div>
+      <div class="result-card">
+        <div class="label">Risk : Reward</div>
+        <div class="value" id="resRR">--</div>
+      </div>
+      <div class="result-card">
+        <div class="label">% Account at Risk</div>
+        <div class="value" id="resRiskPct">--</div>
+      </div>
+      <div class="result-card">
+        <div class="label">Stop Distance</div>
+        <div class="value" id="resStopDist">--</div>
+      </div>
+    </div>
+
+    <div class="rr-bar" id="rrBar"></div>
+    <div class="rr-labels">
+      <span id="barLow">--</span>
+      <span id="barHigh">--</span>
+    </div>
+
+    <button class="action" id="logBtn" disabled>Log to Sheet</button>
+    <div id="logStatus" class="status-msg"></div>
+  </section>
+
+</div>
+
+<div id="settingsView" class="hidden">
+  <section>
+    <h2>Settings</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="backendUrl">Backend URL (optional)</label>
+        <input type="text" id="backendUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+      </div>
+      <div class="field">
+        <label for="backendToken">Token</label>
+        <input type="text" id="backendToken" placeholder="pond-trading-2026" />
+      </div>
+    </div>
+    <p class="note">
+      The calculator works fully offline without a backend. If you set a Backend URL
+      (a Google Apps Script Web App, see google-apps-script.js), the "Log to Sheet"
+      button on the Calculator tab will send each calculated trade plan there for
+      record-keeping.
+    </p>
+    <button class="save" id="saveSettings">Save Settings</button>
+    <div id="settingsStatus" class="status-msg"></div>
+  </section>
+</div>
+
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  const state = {
+    direction: 'long',
+    riskMode: 'percent'
+  };
+
+  // ---- Tabs ----
+  function showTab(tab) {
+    $('calcView').classList.toggle('hidden', tab !== 'calc');
+    $('settingsView').classList.toggle('hidden', tab !== 'settings');
+    $('tabCalc').classList.toggle('active', tab === 'calc');
+    $('tabSettings').classList.toggle('active', tab === 'settings');
+  }
+  $('tabCalc').addEventListener('click', () => showTab('calc'));
+  $('tabSettings').addEventListener('click', () => showTab('settings'));
+
+  // ---- Direction toggle ----
+  $('dirLong').addEventListener('click', () => {
+    state.direction = 'long';
+    $('dirLong').classList.add('active');
+    $('dirShort').classList.remove('active');
+    calculate();
+  });
+  $('dirShort').addEventListener('click', () => {
+    state.direction = 'short';
+    $('dirShort').classList.add('active');
+    $('dirLong').classList.remove('active');
+    calculate();
+  });
+
+  // ---- Risk mode toggle ----
+  $('riskPercentBtn').addEventListener('click', () => {
+    state.riskMode = 'percent';
+    $('riskPercentBtn').classList.add('active');
+    $('riskDollarBtn').classList.remove('active');
+    $('riskValueLabel').textContent = 'Risk %';
+    calculate();
+  });
+  $('riskDollarBtn').addEventListener('click', () => {
+    state.riskMode = 'dollar';
+    $('riskDollarBtn').classList.add('active');
+    $('riskPercentBtn').classList.remove('active');
+    $('riskValueLabel').textContent = 'Risk $';
+    calculate();
+  });
+
+  // ---- Instrument ----
+  function updateCustomPointVisibility() {
+    const isCustom = $('instrument').value === 'custom';
+    $('customPointWrap').classList.toggle('hidden', !isCustom);
+  }
+  $('instrument').addEventListener('change', () => {
+    updateCustomPointVisibility();
+    calculate();
+  });
+
+  function getPointValue() {
+    const sel = $('instrument');
+    if (sel.value === 'custom') {
+      return parseFloat($('customPoint').value) || 0;
+    }
+    const opt = sel.options[sel.selectedIndex];
+    return parseFloat(opt.dataset.point) || 0;
+  }
+
+  // ---- Calculation ----
+  function fmtMoney(n) {
+    return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  let lastResult = null;
+
+  function calculate() {
+    const balance = parseFloat($('balance').value);
+    const riskValue = parseFloat($('riskValue').value);
+    const entry = parseFloat($('entry').value);
+    const stop = parseFloat($('stop').value);
+    const target = parseFloat($('target').value);
+    const pointValue = getPointValue();
+
+    const warningEl = $('warningMsg');
+    warningEl.classList.add('hidden');
+
+    if (isNaN(entry) || isNaN(stop) || isNaN(riskValue) || pointValue <= 0) {
+      resetResults();
+      return;
+    }
+
+    const stopDistance = Math.abs(entry - stop);
+    if (stopDistance === 0) {
+      resetResults();
+      warningEl.textContent = 'Stop price must be different from entry price.';
+      warningEl.classList.remove('hidden');
+      return;
+    }
+
+    const riskAmount = state.riskMode === 'percent'
+      ? (isNaN(balance) ? 0 : balance * (riskValue / 100))
+      : riskValue;
+
+    const dollarRiskPerContract = stopDistance * pointValue;
+    const positionSize = Math.floor(riskAmount / dollarRiskPerContract);
+    const actualRisk = positionSize * dollarRiskPerContract;
+    const actualRiskPct = (!isNaN(balance) && balance > 0) ? (actualRisk / balance) * 100 : null;
+
+    let rewardDistance = null, rewardAmount = null, rrRatio = null;
+    if (!isNaN(target)) {
+      rewardDistance = Math.abs(target - entry);
+      rewardAmount = positionSize * rewardDistance * pointValue;
+      rrRatio = rewardDistance / stopDistance;
+    }
+
+    if (positionSize === 0) {
+      warningEl.textContent = 'Risk amount is too small to cover even 1 contract at this stop distance.';
+      warningEl.classList.remove('hidden');
+    }
+
+    $('resSize').textContent = positionSize;
+    $('resRisk').textContent = fmtMoney(actualRisk);
+    $('resReward').textContent = rewardAmount === null ? '--' : fmtMoney(rewardAmount);
+    $('resRR').textContent = rrRatio === null ? '--' : ('1 : ' + rrRatio.toFixed(2));
+    $('resRiskPct').textContent = actualRiskPct === null ? '--' : (actualRiskPct.toFixed(2) + '%');
+    $('resStopDist').textContent = stopDistance.toFixed(4).replace(/\.?0+$/, '') || '0';
+
+    renderBar(entry, stop, target);
+
+    lastResult = {
+      instrument: $('instrument').value,
+      direction: state.direction,
+      pointValue, entry, stop,
+      target: isNaN(target) ? null : target,
+      positionSize, riskAmount: actualRisk,
+      rewardAmount, rrRatio,
+      accountBalance: isNaN(balance) ? null : balance,
+      riskPercent: state.riskMode === 'percent' ? riskValue : null
+    };
+
+    $('logBtn').disabled = !($('backendUrl').value.trim()) || positionSize <= 0;
+  }
+
+  function resetResults() {
+    ['resSize','resRisk','resReward','resRR','resRiskPct','resStopDist'].forEach(id => $(id).textContent = '--');
+    $('rrBar').innerHTML = '';
+    $('barLow').textContent = '--';
+    $('barHigh').textContent = '--';
+    $('logBtn').disabled = true;
+    lastResult = null;
+  }
+
+  function renderBar(entry, stop, target) {
+    const bar = $('rrBar');
+    bar.innerHTML = '';
+
+    const points = [entry, stop];
+    if (!isNaN(target)) points.push(target);
+    const low = Math.min(...points);
+    const high = Math.max(...points);
+    const range = high - low;
+
+    if (range === 0) {
+      $('barLow').textContent = low.toString();
+      $('barHigh').textContent = high.toString();
+      return;
+    }
+
+    const pct = v => ((v - low) / range) * 100;
+
+    // Risk segment: between entry and stop
+    const riskSeg = document.createElement('div');
+    riskSeg.className = 'segment seg-risk';
+    const r1 = pct(entry), r2 = pct(stop);
+    riskSeg.style.left = Math.min(r1, r2) + '%';
+    riskSeg.style.width = Math.abs(r1 - r2) + '%';
+    bar.appendChild(riskSeg);
+
+    // Reward segment: between entry and target
+    if (!isNaN(target)) {
+      const rewardSeg = document.createElement('div');
+      rewardSeg.className = 'segment seg-reward';
+      const t1 = pct(entry), t2 = pct(target);
+      rewardSeg.style.left = Math.min(t1, t2) + '%';
+      rewardSeg.style.width = Math.abs(t1 - t2) + '%';
+      bar.appendChild(rewardSeg);
+    }
+
+    addMarker(bar, pct(entry), 'Entry ' + entry);
+    addMarker(bar, pct(stop), 'Stop ' + stop);
+    if (!isNaN(target)) addMarker(bar, pct(target), 'Target ' + target);
+
+    $('barLow').textContent = low.toString();
+    $('barHigh').textContent = high.toString();
+  }
+
+  function addMarker(bar, pctVal, label) {
+    const marker = document.createElement('div');
+    marker.className = 'marker';
+    marker.style.left = pctVal + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'marker-label';
+    lbl.style.left = pctVal + '%';
+    lbl.textContent = label;
+    marker.appendChild(lbl);
+    bar.appendChild(marker);
+  }
+
+  // ---- Inputs that trigger recalculation ----
+  ['balance','riskValue','entry','stop','target','customPoint'].forEach(id => {
+    $(id).addEventListener('input', calculate);
+  });
+
+  // ---- Settings persistence ----
+  function loadSettings() {
+    const url = localStorage.getItem('backendUrl') || '';
+    const token = localStorage.getItem('backendToken') || '';
+    $('backendUrl').value = url;
+    $('backendToken').value = token;
+  }
+
+  $('saveSettings').addEventListener('click', () => {
+    localStorage.setItem('backendUrl', $('backendUrl').value.trim());
+    localStorage.setItem('backendToken', $('backendToken').value.trim());
+    $('settingsStatus').textContent = 'Settings saved.';
+    $('settingsStatus').className = 'status-msg success';
+    calculate();
+  });
+
+  // ---- Log to Sheet ----
+  $('logBtn').addEventListener('click', async () => {
+    if (!lastResult) return;
+    const url = localStorage.getItem('backendUrl');
+    const token = localStorage.getItem('backendToken');
+    const logStatus = $('logStatus');
+    $('logBtn').disabled = true;
+    logStatus.textContent = 'Sending...';
+    logStatus.className = 'status-msg';
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ token, timestamp: new Date().toISOString() }, lastResult))
+      });
+      const data = await res.json();
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || 'Request failed');
+      }
+      logStatus.textContent = 'Logged to sheet successfully.';
+      logStatus.className = 'status-msg success';
+    } catch (err) {
+      logStatus.textContent = 'Error: ' + err.message;
+      logStatus.className = 'status-msg error';
+    } finally {
+      $('logBtn').disabled = false;
+    }
+  });
+
+  // ---- Persist form values across reloads ----
+  const PERSIST_FIELDS = ['instrument','customPoint','balance','riskValue','entry','stop','target'];
+  PERSIST_FIELDS.forEach(id => {
+    const saved = localStorage.getItem('field_' + id);
+    if (saved !== null) $(id).value = saved;
+    $(id).addEventListener('input', () => localStorage.setItem('field_' + id, $(id).value));
+    $(id).addEventListener('change', () => localStorage.setItem('field_' + id, $(id).value));
+  });
+
+  // ---- Init ----
+  loadSettings();
+  updateCustomPointVisibility();
+  calculate();
+</script>
+</body>
+</html>
