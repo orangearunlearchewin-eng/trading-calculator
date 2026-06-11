@@ -17,7 +17,7 @@ const SECRET_TOKEN = 'pond-trading-2026';
 const SHEET_NAME = 'Trade Plans';
 const HEADER_ROW = [
   'Logged At', 'Instrument', 'Direction', 'Entry', 'Stop', 'Target',
-  'Position Size', 'Risk $', 'Reward $', 'R:R', 'Account Balance', 'Risk %'
+  'Contracts', 'Risk $', 'Reward $', 'R:R', 'Stop Ticks'
 ];
 
 function doPost(e) {
@@ -36,12 +36,11 @@ function doPost(e) {
       body.entry,
       body.stop,
       body.target,
-      body.positionSize,
-      body.riskAmount,
-      body.rewardAmount,
+      body.contracts,
+      body.dollarRisk,
+      body.dollarReward,
       body.rrRatio,
-      body.accountBalance,
-      body.riskPercent
+      body.stopTicks
     ]);
 
     return jsonResponse({ success: true });

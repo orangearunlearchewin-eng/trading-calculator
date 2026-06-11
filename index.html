@@ -238,6 +238,10 @@
         <label for="customPoint">Point Value ($ per 1.00)</label>
         <input type="number" id="customPoint" step="any" placeholder="e.g. 50" />
       </div>
+      <div class="field" id="customTickWrap">
+        <label for="customTick">Tick Size</label>
+        <input type="number" id="customTick" step="any" placeholder="e.g. 0.25" />
+      </div>
       <div class="field">
         <label>Direction</label>
         <div class="toggle-group">
@@ -245,26 +249,9 @@
           <button id="dirShort">Short</button>
         </div>
       </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>Account &amp; Risk</h2>
-    <div class="grid">
       <div class="field">
-        <label for="balance">Account Balance ($)</label>
-        <input type="number" id="balance" step="any" placeholder="e.g. 50000" />
-      </div>
-      <div class="field">
-        <label>Risk Mode</label>
-        <div class="toggle-group">
-          <button id="riskPercentBtn" class="active">% of account</button>
-          <button id="riskDollarBtn">$ amount</button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="riskValue" id="riskValueLabel">Risk %</label>
-        <input type="number" id="riskValue" step="any" placeholder="e.g. 1" value="100" />
+        <label for="contracts">Contracts</label>
+        <input type="number" id="contracts" step="1" min="1" placeholder="e.g. 1" value="1" />
       </div>
     </div>
   </section>
@@ -292,10 +279,6 @@
     <div id="warningMsg" class="warning hidden"></div>
     <div class="results-grid">
       <div class="result-card">
-        <div class="label">Position Size</div>
-        <div class="value" id="resSize">--</div>
-      </div>
-      <div class="result-card">
         <div class="label">Dollar Risk</div>
         <div class="value negative" id="resRisk">--</div>
       </div>
@@ -308,12 +291,8 @@
         <div class="value" id="resRR">--</div>
       </div>
       <div class="result-card">
-        <div class="label">% Account at Risk</div>
-        <div class="value" id="resRiskPct">--</div>
-      </div>
-      <div class="result-card">
-        <div class="label">Stop Distance</div>
-        <div class="value" id="resStopDist">--</div>
+        <div class="label">Stop Distance (ticks)</div>
+        <div class="value" id="resStopTicks">--</div>
       </div>
     </div>
 
@@ -359,8 +338,7 @@
   const $ = id => document.getElementById(id);
 
   const state = {
-    direction: 'long',
-    riskMode: 'percent'
+    direction: 'long'
   };
 
   // ---- Tabs ----
@@ -387,29 +365,14 @@
     calculate();
   });
 
-  // ---- Risk mode toggle ----
-  $('riskPercentBtn').addEventListener('click', () => {
-    state.riskMode = 'percent';
-    $('riskPercentBtn').classList.add('active');
-    $('riskDollarBtn').classList.remove('active');
-    $('riskValueLabel').textContent = 'Risk %';
-    calculate();
-  });
-  $('riskDollarBtn').addEventListener('click', () => {
-    state.riskMode = 'dollar';
-    $('riskDollarBtn').classList.add('active');
-    $('riskPercentBtn').classList.remove('active');
-    $('riskValueLabel').textContent = 'Risk $';
-    calculate();
-  });
-
   // ---- Instrument ----
-  function updateCustomPointVisibility() {
+  function updateCustomFieldsVisibility() {
     const isCustom = $('instrument').value === 'custom';
     $('customPointWrap').classList.toggle('hidden', !isCustom);
+    $('customTickWrap').classList.toggle('hidden', !isCustom);
   }
   $('instrument').addEventListener('change', () => {
-    updateCustomPointVisibility();
+    updateCustomFieldsVisibility();
     calculate();
   });
 
@@ -422,25 +385,38 @@
     return parseFloat(opt.dataset.point) || 0;
   }
 
+  function getTickSize() {
+    const sel = $('instrument');
+    if (sel.value === 'custom') {
+      return parseFloat($('customTick').value) || 0;
+    }
+    const opt = sel.options[sel.selectedIndex];
+    return parseFloat(opt.dataset.tick) || 0;
+  }
+
   // ---- Calculation ----
   function fmtMoney(n) {
     return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function trimTrailingZeros(s) {
+    return s.replace(/\.?0+$/, '') || '0';
+  }
+
   let lastResult = null;
 
   function calculate() {
-    const balance = parseFloat($('balance').value);
-    const riskValue = parseFloat($('riskValue').value);
     const entry = parseFloat($('entry').value);
     const stop = parseFloat($('stop').value);
     const target = parseFloat($('target').value);
+    const contracts = parseFloat($('contracts').value);
     const pointValue = getPointValue();
+    const tickSize = getTickSize();
 
     const warningEl = $('warningMsg');
     warningEl.classList.add('hidden');
 
-    if (isNaN(entry) || isNaN(stop) || isNaN(riskValue) || pointValue <= 0) {
+    if (isNaN(entry) || isNaN(stop) || isNaN(contracts) || contracts <= 0 || pointValue <= 0) {
       resetResults();
       return;
     }
@@ -453,52 +429,37 @@
       return;
     }
 
-    const riskAmount = state.riskMode === 'percent'
-      ? (isNaN(balance) ? 0 : balance * (riskValue / 100))
-      : riskValue;
+    const dollarRisk = contracts * stopDistance * pointValue;
+    const stopTicks = tickSize > 0 ? stopDistance / tickSize : null;
 
-    const dollarRiskPerContract = stopDistance * pointValue;
-    const positionSize = Math.floor(riskAmount / dollarRiskPerContract);
-    const actualRisk = positionSize * dollarRiskPerContract;
-    const actualRiskPct = (!isNaN(balance) && balance > 0) ? (actualRisk / balance) * 100 : null;
-
-    let rewardDistance = null, rewardAmount = null, rrRatio = null;
+    let rewardDistance = null, dollarReward = null, rrRatio = null;
     if (!isNaN(target)) {
       rewardDistance = Math.abs(target - entry);
-      rewardAmount = positionSize * rewardDistance * pointValue;
+      dollarReward = contracts * rewardDistance * pointValue;
       rrRatio = rewardDistance / stopDistance;
     }
 
-    if (positionSize === 0) {
-      warningEl.textContent = 'Risk amount is too small to cover even 1 contract at this stop distance.';
-      warningEl.classList.remove('hidden');
-    }
-
-    $('resSize').textContent = positionSize;
-    $('resRisk').textContent = fmtMoney(actualRisk);
-    $('resReward').textContent = rewardAmount === null ? '--' : fmtMoney(rewardAmount);
+    $('resRisk').textContent = fmtMoney(dollarRisk);
+    $('resReward').textContent = dollarReward === null ? '--' : fmtMoney(dollarReward);
     $('resRR').textContent = rrRatio === null ? '--' : ('1 : ' + rrRatio.toFixed(2));
-    $('resRiskPct').textContent = actualRiskPct === null ? '--' : (actualRiskPct.toFixed(2) + '%');
-    $('resStopDist').textContent = stopDistance.toFixed(4).replace(/\.?0+$/, '') || '0';
+    $('resStopTicks').textContent = stopTicks === null ? '--' : trimTrailingZeros(stopTicks.toFixed(2));
 
     renderBar(entry, stop, target);
 
     lastResult = {
       instrument: $('instrument').value,
       direction: state.direction,
-      pointValue, entry, stop,
+      pointValue, tickSize,
+      entry, stop,
       target: isNaN(target) ? null : target,
-      positionSize, riskAmount: actualRisk,
-      rewardAmount, rrRatio,
-      accountBalance: isNaN(balance) ? null : balance,
-      riskPercent: state.riskMode === 'percent' ? riskValue : null
+      contracts, dollarRisk, dollarReward, rrRatio, stopTicks
     };
 
-    $('logBtn').disabled = !($('backendUrl').value.trim()) || positionSize <= 0;
+    $('logBtn').disabled = !($('backendUrl').value.trim());
   }
 
   function resetResults() {
-    ['resSize','resRisk','resReward','resRR','resRiskPct','resStopDist'].forEach(id => $(id).textContent = '--');
+    ['resRisk','resReward','resRR','resStopTicks'].forEach(id => $(id).textContent = '--');
     $('rrBar').innerHTML = '';
     $('barLow').textContent = '--';
     $('barHigh').textContent = '--';
@@ -563,7 +524,7 @@
   }
 
   // ---- Inputs that trigger recalculation ----
-  ['balance','riskValue','entry','stop','target','customPoint'].forEach(id => {
+  ['entry','stop','target','contracts','customPoint','customTick'].forEach(id => {
     $(id).addEventListener('input', calculate);
   });
 
@@ -614,7 +575,7 @@
   });
 
   // ---- Persist form values across reloads ----
-  const PERSIST_FIELDS = ['instrument','customPoint','balance','riskValue','entry','stop','target'];
+  const PERSIST_FIELDS = ['instrument','customPoint','customTick','contracts','entry','stop','target'];
   PERSIST_FIELDS.forEach(id => {
     const saved = localStorage.getItem('field_' + id);
     if (saved !== null) $(id).value = saved;
@@ -624,7 +585,7 @@
 
   // ---- Init ----
   loadSettings();
-  updateCustomPointVisibility();
+  updateCustomFieldsVisibility();
   calculate();
 </script>
 </body>
